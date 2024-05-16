@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Module for task 0
 
 Create a Cache class. In the __init__ method, store an instance of the
@@ -9,6 +9,7 @@ Create a store method that takes a data argument and returns a string.
 The method should generate a random key (e.g. using uuid), store the input
 data in Redis using the random key and return the key.
 """
+
 import redis
 import uuid
 from typing import Union, Callable, Optional

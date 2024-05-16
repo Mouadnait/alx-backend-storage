@@ -1,89 +1,48 @@
 #!/usr/bin/env python3
-"""Web.py"""
-
+"""Module for implementing an expiring web cache and tracker
+"""
 import requests
-import redis
-from time import sleep
+from functools import wraps
+from redis import Redis as R
+from typing import Callable
 
-# Initialize Redis client
-r = redis.Redis(host='localhost', port=6379, db=0)
 
+def count_url(method: Callable) -> Callable:
+    """_summary_
+    count_url : count
+    how many times a url is accessed        
+    """
+    @wraps(fn)
+    def wrapper(url):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
+        cached_url = f'cached:{url}'
+        cached_data = R.get(cached_url)
+        if cached_data:
+            return cached_data.decode('utf-8')
+        count_key = f'count:{url}'
+        html_cont = method(url)
+
+        R.incr(count_key)
+        R.set(cached_url, html_cont)
+        R.expire(cached_url, 10)
+        return html_cont
+    return wrapper
+
+
+@count_url
 def get_page(url: str) -> str:
-    """Fetch the HTML content of a URL and cache the result with expiration.
-    Also track the number of accesses to the URL.
+    """_summary_
 
     Args:
-        url (str): The URL to fetch.
+        url (str): _description_
 
     Returns:
-        str: The HTML content of the URL.
+        str: _description_
+        html content of a given url
     """
-    # Check if the page is cached
-    cached_page = r.get(f"cache:{url}")
-    if cached_page:
-        return cached_page.decode('utf-8')
-    
-    # If not cached, fetch the page
-    response = requests.get(url)
-    html_content = response.text
-
-    # Cache the result with an expiration time of 10 seconds
-    r.setex(f"cache:{url}", 10, html_content)
-
-    # Increment the access count
-    r.incr(f"count:{url}")
-
-    return html_content
-
-# Bonus: Implementing with decorators
-def cache_and_track(expiration: int):
-    def decorator(func):
-        def wrapper(url: str):
-            # Check if the page is cached
-            cached_page = r.get(f"cache:{url}")
-            if cached_page:
-                return cached_page.decode('utf-8')
-
-            # If not cached, fetch the page
-            html_content = func(url)
-
-            # Cache the result with an expiration time
-            r.setex(f"cache:{url}", expiration, html_content)
-
-            # Increment the access count
-            r.incr(f"count:{url}")
-
-            return html_content
-        return wrapper
-    return decorator
-
-@cache_and_track(expiration=10)
-def get_page_decorated(url: str) -> str:
-    """Fetch the HTML content of a URL without caching logic.
-    
-    Args:
-        url (str): The URL to fetch.
-    
-    Returns:
-        str: The HTML content of the URL.
-    """
-    response = requests.get(url)
-    return response.text
-
-# Example usage
-if __name__ == "__main__":
-    test_url = "http://slowwly.robertomurray.co.uk"
-    
-    # Using the non-decorated version
-    print(get_page(test_url))
-    
-    # Sleep for a bit to see caching in action
-    sleep(5)
-    print(get_page(test_url))
-    
-    # Using the decorated version
-    print(get_page_decorated(test_url))
-    
-    # Sleep for a bit to see caching in action
-    sleep(5)
-    print(get_page_decorated(test_url))
+    resp = requests.get(url)
+    return resp.text
